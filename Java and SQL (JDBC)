@@ -1,0 +1,89 @@
+package jdbc;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Savepoint;
+import java.util.Scanner;
+
+public class transaction_bank {
+
+	public static void main(String[] args) {
+		String url = "jdbc:mysql://localhost:3306/sinchu_bank";
+		String u = "root";
+		String p = "root";
+		String query = "Select * From bank_accounts where id=? and pin=?";
+		Scanner scan = new Scanner(System.in);		 
+			try {
+				Class.forName("com.mysql.cj.jdbc.Driver");
+				Connection con = DriverManager.getConnection(url, u, p);
+				System.out.println("<--------WELCOME TO SINCHU BANK---------->");
+				PreparedStatement pstat = con.prepareStatement(query);
+				
+				System.out.println("enter id:");
+				int sacc=scan.nextInt();
+				pstat.setInt(1, sacc);
+				System.out.println("enter pin:");
+				pstat.setInt(2, scan.nextInt());
+				ResultSet res = pstat.executeQuery();
+				res.next();
+				String name = res.getString(2);
+				int bal=res.getInt(4);
+				System.out.println("welcome  "+name);
+				System.out.println("your balance is "+bal);
+				
+				
+				//transfer details
+				System.out.println("<--------TRANSFER DETAILS--------->");
+				
+				
+				System.out.println("Enter the amount to transfer:");
+				int Tamt = scan.nextInt();
+				con.setAutoCommit(false);
+				Savepoint Savepoint = con.setSavepoint();
+				PreparedStatement pstat2 = con.prepareStatement("update bank_accounts set balance=balance - ? where id=?");
+				
+				
+				pstat2.setInt(2, sacc);
+				pstat2.setInt(1, Tamt);
+				pstat2.executeUpdate();
+				System.out.println("enter account no.to amount should be transfered:");
+				int Tacc=scan.nextInt();
+				System.out.println("credit request");
+				System.out.println(name+" account no. "+sacc+" wants to send amt"+Tacc);
+				System.out.println("press y to receive");
+				System.out.println("press N to reject");
+				String choice = scan.next();
+				
+				if(choice.equals("y")) {
+					System.out.println("recievers bank");
+					PreparedStatement pstat3 = con.prepareStatement("update bank_accounts set balance=balance + ? where id=?");
+					pstat3.setInt(1, Tamt);
+					pstat3.setInt(2, Tacc);
+					pstat3.executeUpdate();	
+					PreparedStatement pstat4 = con.prepareStatement("select * from bank_accounts where id = ?");
+					pstat4.setInt(1, Tacc);
+					ResultSet res1 = pstat4.executeQuery();
+					res1.next();
+					System.out.println("updated balance is: "+res1.getInt(4));
+					
+				}
+				else {
+					con.rollback(Savepoint);
+					System.out.println("transfer rejected");
+					PreparedStatement pstat5 = con.prepareStatement("select * from bank_accounts where id = ?");
+					pstat5.setInt(1, Tacc);
+					ResultSet res1 = pstat5.executeQuery();
+					res1.next();
+					System.out.println("existing balance is: "+res1.getInt(4));
+					
+				}
+				con.commit();
+				scan.close();
+			} catch (ClassNotFoundException | SQLException e) {
+				e.printStackTrace();
+			}	
+	}
+}
